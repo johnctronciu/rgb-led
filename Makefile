@@ -1,6 +1,6 @@
 CXXFLAGS=-Wall -O3 -g
-OBJECTS=test.o
-BINARIES=test
+OBJECTS=test.o displayScenes
+BINARIES=test displayScenes
 
 RGB_INCDIR=matrix/include
 RGB_LIBDIR=matrix/lib
@@ -19,6 +19,9 @@ $(RGB_LIBRARY): FORCE
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 test.o : test.cpp # Need this explicit declaration cause of git submodule? it cant find the headers without this for whatever reason
+#if not reliant on submodule code can just put it in OBJECTS and BINARIES
+
+displayScenes.o : displayScenes.cpp # Need this explicit declaration cause of git submodule? it cant find the headers without this for whatever reason
 #if not reliant on submodule code can just put it in OBJECTS and BINARIES
 
 %.o : %.cpp

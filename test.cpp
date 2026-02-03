@@ -123,6 +123,7 @@ int main(int argc, char *argv[]) {
   const char *input_file = NULL;
   std::string line;
   bool xorigin_configured = false;
+  bool yorigin_configured = false;
   int x_orig = 0;
   int y_orig = 0;
   int letter_spacing = 0;
@@ -252,9 +253,20 @@ if (all_extreme_colors) {
     }
   }
 
+  if (!yorigin_configured) {
+    if (speed == 0) {
+      // There would be no scrolling, so text would never appear. Move to front.
+      y_orig = with_outline ? 1 : 0;
+    } else {
+      y_orig = scroll_direction < 0 ? 0 : 0;
+    }
+  }
+
   int x = x_orig;
   int y = y_orig;
   int length = 0;
+  int height = 0;
+  int max_length = 0;
   std::vector<std::string> lines;
 
   // Initialize lines with the initial content
@@ -274,10 +286,88 @@ if (all_extreme_colors) {
   }
 }
   struct timespec next_frame = {0, 0};
+  int counter = 0;
 
   uint64_t frame_counter = 0;
   while (!interrupt_received && loops != 0) {
-    if (input_file && ReadLineOnChange(input_file, &line, &last_change)) {
+    printf ("X values is: %d \n", x);
+    printf ("Y values is: %d \n", y);
+    if (counter % 3 == 0){
+      if ("displayWeek.txt" && ReadLineOnChange("displayWeek.txt", &line, &last_change)) {
+        x = x_orig;
+        std::string l;
+
+        for (char c : line){
+          if (c == '\n'){
+              lines.push_back(l);
+              l.clear();
+          }
+          else{
+              l += c;
+          }
+        }
+
+      if (!l.empty()){
+              lines.push_back(l);
+          }
+        }
+
+      ++frame_counter;
+      offscreen_canvas->Fill(bg_color.r, bg_color.g, bg_color.b);
+      const bool draw_on_frame = (blink_on <= 0)
+        || (frame_counter % (blink_on + blink_off) < (uint64_t)blink_on);
+
+      if (draw_on_frame) {
+        if (outline_font) {
+          // The outline font, we need to write with a negative (-2) text-spacing,
+          // as we want to have the same letter pitch as the regular text that
+          // we then write on top.
+          rgb_matrix::DrawText(offscreen_canvas, *outline_font,
+                              x - 1, y + font.baseline(),
+                              outline_color, NULL,
+                              line.c_str(), letter_spacing - 2);
+        }
+
+        // length = holds how many pixels our text takes up
+        for (size_t i = 0; i < lines.size(); i++) {
+          height = y + (i * font.height());
+          length = rgb_matrix::DrawText(offscreen_canvas, font, x, height + font.baseline(),
+                              color, NULL, lines[i].c_str(), letter_spacing);
+          max_length = (length > max_length) ? length : max_length;
+                      
+      }
+  }
+
+      x += scroll_direction;
+      if ((scroll_direction < 0 && x + max_length < 0) ||
+          (scroll_direction > 0 && x > canvas->width())) {
+        x = x_orig + ((scroll_direction > 0) ? -max_length : 0);
+        if (loops){
+          --loops;
+          ++counter;
+          lines.clear();
+          canvas->Clear();
+          max_length = 0;
+          x = x_orig;
+        } 
+      }
+
+      // Make sure render-time delays are not influencing scroll-time
+      if (speed > 0) {
+        if (next_frame.tv_sec == 0 && next_frame.tv_nsec == 0) {
+          // First time. Start timer, but don't wait.
+          clock_gettime(CLOCK_MONOTONIC, &next_frame);
+        } else {
+          add_micros(&next_frame, delay_speed_usec);
+          clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next_frame, NULL);
+        }
+      }
+      // Swap the offscreen_canvas with canvas on vsync, avoids flickering
+      offscreen_canvas = canvas->SwapOnVSync(offscreen_canvas);
+      if (speed <= 0) pause();  // Nothing to scroll.
+    }
+  else if (counter % 3 == 1){
+    if ("displayEvents.txt" && ReadLineOnChange("displayEvents.txt", &line, &last_change)) {
       x = x_orig;
       std::string l;
 
@@ -294,7 +384,8 @@ if (all_extreme_colors) {
     if (!l.empty()){
             lines.push_back(l);
         }
-    }
+      }
+
     ++frame_counter;
     offscreen_canvas->Fill(bg_color.r, bg_color.g, bg_color.b);
     const bool draw_on_frame = (blink_on <= 0)
@@ -306,25 +397,33 @@ if (all_extreme_colors) {
         // as we want to have the same letter pitch as the regular text that
         // we then write on top.
         rgb_matrix::DrawText(offscreen_canvas, *outline_font,
-                             x - 1, y + font.baseline(),
-                             outline_color, NULL,
-                             line.c_str(), letter_spacing - 2);
+                            x - 1, y + font.baseline(),
+                            outline_color, NULL,
+                            line.c_str(), letter_spacing - 2);
       }
 
       // length = holds how many pixels our text takes up
       for (size_t i = 0; i < lines.size(); i++) {
-        int new_y = y + (i * font.height());
-        length = rgb_matrix::DrawText(offscreen_canvas, font, x, new_y + font.baseline(),
+        height = y + (i * font.height());
+        length = rgb_matrix::DrawText(offscreen_canvas, font, x, height + font.baseline(),
                             color, NULL, lines[i].c_str(), letter_spacing);
+        max_length = (length > max_length) ? length : max_length;
+                    
     }
 }
-
-    x += scroll_direction;
-    if ((scroll_direction < 0 && x + length < 0) ||
-        (scroll_direction > 0 && x > canvas->width())) {
-      x = x_orig + ((scroll_direction > 0) ? -length : 0);
-      if (loops > 0) --loops;
-    }
+    y += scroll_direction;
+    x = 0;
+    // if ((scroll_direction < 0 && x + max_length < 0) ||
+    //     (scroll_direction > 0 && x > canvas->width())) {
+    //   x = x_orig + ((scroll_direction > 0) ? -max_length : 0);
+    //   if (loops){
+    //     --loops;
+    //     ++counter;
+    //     lines.clear();
+    //     canvas->Clear();
+    //     max_length = 0;
+    //   } 
+    // }
 
     // Make sure render-time delays are not influencing scroll-time
     if (speed > 0) {
@@ -340,7 +439,80 @@ if (all_extreme_colors) {
     offscreen_canvas = canvas->SwapOnVSync(offscreen_canvas);
     if (speed <= 0) pause();  // Nothing to scroll.
   }
+else if (counter % 3 == 2){
+    if ("displayDailyProgress.txt" && ReadLineOnChange("displayDailyProgress.txt", &line, &last_change)) {
+      x = x_orig;
+      std::string l;
 
+      for (char c : line){
+        if (c == '\n'){
+            lines.push_back(l);
+            l.clear();
+        }
+        else{
+            l += c;
+        }
+      }
+
+    if (!l.empty()){
+            lines.push_back(l);
+        }
+      }
+
+    ++frame_counter;
+    offscreen_canvas->Fill(bg_color.r, bg_color.g, bg_color.b);
+    const bool draw_on_frame = (blink_on <= 0)
+      || (frame_counter % (blink_on + blink_off) < (uint64_t)blink_on);
+
+    if (draw_on_frame) {
+      if (outline_font) {
+        // The outline font, we need to write with a negative (-2) text-spacing,
+        // as we want to have the same letter pitch as the regular text that
+        // we then write on top.
+        rgb_matrix::DrawText(offscreen_canvas, *outline_font,
+                            x - 1, y + font.baseline(),
+                            outline_color, NULL,
+                            line.c_str(), letter_spacing - 2);
+      }
+
+      // length = holds how many pixels our text takes up
+      for (size_t i = 0; i < lines.size(); i++) {
+        height = y + (i * font.height());
+        length = rgb_matrix::DrawText(offscreen_canvas, font, x, height + font.baseline(),
+                            color, NULL, lines[i].c_str(), letter_spacing);
+        max_length = (length > max_length) ? length : max_length;
+                    
+    }
+}
+
+    y += scroll_direction;
+    if ((scroll_direction < 0 && x + max_length < 0) ||
+        (scroll_direction > 0 && x > canvas->width())) {
+      x = x_orig + ((scroll_direction > 0) ? -max_length : 0);
+      if (loops){
+        --loops;
+        ++counter;
+        lines.clear();
+        canvas->Clear();
+        max_length = 0;
+      } 
+    }
+
+    // Make sure render-time delays are not influencing scroll-time
+    if (speed > 0) {
+      if (next_frame.tv_sec == 0 && next_frame.tv_nsec == 0) {
+        // First time. Start timer, but don't wait.
+        clock_gettime(CLOCK_MONOTONIC, &next_frame);
+      } else {
+        add_micros(&next_frame, delay_speed_usec);
+        clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next_frame, NULL);
+      }
+    }
+    // Swap the offscreen_canvas with canvas on vsync, avoids flickering
+    offscreen_canvas = canvas->SwapOnVSync(offscreen_canvas);
+    if (speed <= 0) pause();  // Nothing to scroll.
+    }
+  }
   // Finished. Shut down the RGB matrix.
   canvas->Clear();
   delete canvas;
