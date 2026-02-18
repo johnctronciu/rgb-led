@@ -2,3 +2,4 @@ test
 *.o
 displayScenes
 *.txt
+/scenes
