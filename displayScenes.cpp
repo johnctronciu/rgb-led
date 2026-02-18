@@ -151,6 +151,7 @@ static void DrawFrame(FrameCanvas *offscreen_canvas,
 static bool scroll(displayState &state,
                           int scroll_direction,
                           int canvas_width,
+                          const rgb_matrix::Font &font,
                           int x_orig) {
   if (state.horizontal_scroll) {
     state.x += scroll_direction;
@@ -162,7 +163,7 @@ static bool scroll(displayState &state,
     }
   } else {
     state.y += scroll_direction;
-    if ((scroll_direction < 0 && state.y + (int)state.lines.size() * 16 < 0) ||
+    if ((scroll_direction < 0 && state.y + (int)state.lines.size() * font.height() < 0) ||
         (scroll_direction > 0 && state.y > 64)) {
       state.max_length = 0;
       return true;
@@ -298,7 +299,6 @@ if (all_extreme_colors) {
   }
 
   struct timespec next_frame = {0, 0};
-  int counter = 0;
 
   uint64_t frame_counter = 0;
 
@@ -314,19 +314,18 @@ if (all_extreme_colors) {
     displayState &s = screens[curr_screen];
     readLines(s);
 
-    printf ("X values is: %d \n", s.x);
-    printf ("Y values is: %d \n", s.y);
-
     offscreen_canvas->Fill(bg_color.r, bg_color.g, bg_color.b);
 
-    DrawFrame(offscreen_canvas, s, font, color, bg_color, letter_spacing);
+    const bool draw_on_frame = (blink_on <= 0)
+      || (frame_counter % (blink_on + blink_off) < (uint64_t)blink_on);
 
-    bool next_scene = scroll(s, scroll_direction, canvas->width(), x_orig);
+    if(draw_on_frame){
+      DrawFrame(offscreen_canvas, s, font, color, bg_color, letter_spacing);
+    }
 
+    bool next_scene = scroll(s, scroll_direction, canvas->width(), font, x_orig);
 
     if (next_scene) {
-      printf("Screen %d finished scrolling\n", curr_screen);
-
       s.x = s.horizontal_scroll ? canvas->width() : 0;
       s.y = s.horizontal_scroll ? 0 : canvas->height();
       s.max_length = 0;
@@ -334,10 +333,6 @@ if (all_extreme_colors) {
       // Move to next screen
       curr_screen = (curr_screen + 1) % 3;
       screens[curr_screen].last_change = 0;
-
-      printf("Switching to screen %d (%s), lines=%zu\n",
-             curr_screen, screens[curr_screen].filename.c_str(), screens[curr_screen].lines.size());
-      
 
       if (loops > 0) --loops;
     }
