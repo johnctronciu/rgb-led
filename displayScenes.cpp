@@ -46,7 +46,6 @@ static int usage(const char *progname) {
           "\n"
           "\t-C <r,g,b>        : Text Color. Default 255,255,255 (white)\n"
           "\t-B <r,g,b>        : Background-Color. Default 0,0,0\n"
-          "\t-O <r,g,b>        : Outline-Color, e.g. to increase contrast.\n"
           );
   fprintf(stderr, "\nGeneral LED matrix options:\n");
   rgb_matrix::PrintMatrixFlags(stderr);
@@ -116,7 +115,7 @@ static bool readLines(displayState &state) {
   if (!ReadLineOnChange(state.filename.c_str(), &line, &state.last_change)) {
     return false;
   }
-
+  printf("file: %s\n", state.filename.c_str());
   state.lines.clear();
   std::string l;
   for (char c : line) {
@@ -189,16 +188,12 @@ int main(int argc, char *argv[]) {
 
   Color color(255, 255, 255);
   Color bg_color(0, 0, 0);
-  Color outline_color(0,0,0);
-  bool with_outline = false;
 
   const char *bdf_font_file = NULL;
   const char *input_file = NULL;
   std::string line;
   bool xorigin_configured = false;
-  bool yorigin_configured = false;
   int x_orig = 0;
-  int y_orig = 0;
   int letter_spacing = 0;
   float speed = 7.0f;
   int loops = -1;
@@ -224,7 +219,6 @@ int main(int argc, char *argv[]) {
       break;
     case 'l': loops = atoi(optarg); break;
     case 'x': x_orig = atoi(optarg); xorigin_configured = true; break;
-    case 'y': y_orig = atoi(optarg); break;
     case 'f': bdf_font_file = strdup(optarg); break;
     case 'i': input_file = strdup(optarg); break;
     case 't': letter_spacing = atoi(optarg); break;
@@ -239,13 +233,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Invalid background color spec: %s\n", optarg);
         return usage(argv[0]);
       }
-      break;
-    case 'O':
-      if (!parseColor(&outline_color, optarg)) {
-        fprintf(stderr, "Invalid outline color spec: %s\n", optarg);
-        return usage(argv[0]);
-      }
-      with_outline = true;
       break;
     default:
       return usage(argv[0]);
@@ -263,11 +250,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  rgb_matrix::Font *outline_font = NULL;
-  if (with_outline) {
-    outline_font = font.CreateOutlineFont();
-  }
-
   RGBMatrix *canvas = RGBMatrix::CreateFromOptions(matrix_options, runtime_opt);
   if (canvas == NULL){
     return 1;
@@ -276,8 +258,7 @@ int main(int argc, char *argv[]) {
 
 const bool all_extreme_colors = (matrix_options.brightness == 100)
     && FullSaturation(color)
-    && FullSaturation(bg_color)
-    && FullSaturation(outline_color);
+    && FullSaturation(bg_color);
     
 if (all_extreme_colors) {
   canvas->SetPWMBits(1);
@@ -303,9 +284,9 @@ if (all_extreme_colors) {
   uint64_t frame_counter = 0;
 
   displayState screens[3] = {
-    {"displayWeek.txt", {}, 0, canvas->width(), 0, 0, true},
-    {"displayEvents.txt", {}, 0, 0, canvas->height(), 0, false},
-    {"displayDailyProgress.txt", {}, 0, 0, canvas->height(), 0, false}
+    {"scenes/displayWeek.txt", {}, 0, canvas->width(), 0, 0, true},
+    {"scenes/displayEvents.txt", {}, 0, 0, canvas->height(), 0, false},
+    {"scenes/displayDailyProgress.txt", {}, 0, 0, canvas->height(), 0, false}
   };
 
   int curr_screen = 0;
