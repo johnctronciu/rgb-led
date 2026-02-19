@@ -2,5 +2,5 @@
 	path = matrix
 	url = https://github.com/hzeller/rpi-rgb-led-matrix.git
 [submodule "Discord-Bot"]
-	path = Discord-Bot
+	path = dBot
 	url = https://github.com/johnctronciu/Discord-Bot
