@@ -21,6 +21,8 @@
 using namespace std;
 using namespace rgb_matrix;
 
+#define NUM_SCENES 4;
+
 volatile bool interrupt_received = false;
 static void InterruptHandler(int signo) {
   interrupt_received = true;
@@ -283,10 +285,11 @@ if (all_extreme_colors) {
 
   uint64_t frame_counter = 0;
 
-  displayState screens[3] = {
+  displayState screens[4] = {
     {"scenes/displayWeek.txt", {}, 0, canvas->width(), 0, 0, true},
     {"scenes/displayEvents.txt", {}, 0, 0, canvas->height(), 0, false},
-    {"scenes/displayDailyProgress.txt", {}, 0, 0, canvas->height(), 0, false}
+    {"scenes/displayDailyProgress.txt", {}, 0, 0, canvas->height(), 0, false},
+    {"scenes/displayWeather.txt", {}, 0, canvas->width(), 0, 0, true}
   };
 
   int curr_screen = 0;
@@ -312,7 +315,8 @@ if (all_extreme_colors) {
       s.max_length = 0;
 
       // Move to next screen
-      curr_screen = (curr_screen + 1) % 3;
+      curr_screen = (curr_screen + 1) % 4;
+      
       screens[curr_screen].last_change = 0;
 
       if (loops > 0) --loops;
